@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { User, CheckCircle, PlayCircle, MapPin, FileText, Lock, ChevronDown, ChevronUp, BookOpen, LogOut } from 'lucide-react';
+import { User, CheckCircle, PlayCircle, MapPin, FileText, Lock, ChevronDown, ChevronUp, BookOpen, LogOut, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 
-// Ajustamos la ruta de Firebase para que sea más segura
+// Importamos la conexión a Firebase
 import { db } from '../firebase'; 
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -13,9 +13,11 @@ export default function VistaAlVueloPortal() {
   const router = useRouter();
   const [moduloAbierto, setModuloAbierto] = useState(1);
   
-  const [usuario, setUsuario] = useState({ nombre: 'Cargando...', apellido: '', progresoTotal: 0 });
+  // Variables dinámicas para el usuario
+  const [usuario, setUsuario] = useState({ nombre: 'Cargando...', apellido: '', documento: '', progresoTotal: 0 });
   const [cargando, setCargando] = useState(true);
 
+  // Tu currículum original
   const curriculum = [
     {
       id: 1,
@@ -123,11 +125,8 @@ export default function VistaAlVueloPortal() {
 
   if (cargando) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white font-sans">
-        <div className="flex flex-col items-center gap-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-orange-500"></div>
-          <p className="text-xs font-bold tracking-widest">CARGANDO PORTAL...</p>
-        </div>
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-orange-500"></div>
       </div>
     );
   }
@@ -150,10 +149,20 @@ export default function VistaAlVueloPortal() {
           <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 border-2 border-slate-50 shadow-inner shrink-0 overflow-hidden">
             <User size={40} />
           </div>
-          <div>
+          <div className="flex-1">
             <h2 className="text-2xl font-black text-slate-800 capitalize">{usuario.nombre} {usuario.apellido}</h2>
             <p className="text-orange-600 font-bold uppercase text-xs tracking-widest mt-1">Colaborador en Entrenamiento</p>
             <p className="text-sm text-slate-500 mt-2">Progreso Total: <strong className="text-slate-800">{usuario.progresoTotal}%</strong></p>
+            
+            {/* BOTÓN SECRETO PARA EL ADMINISTRADOR */}
+            {usuario.documento === '1128459431' && (
+              <Link 
+                href="/admin" 
+                className="mt-4 inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-md"
+              >
+                <BarChart3 size={14} /> Panel de Control Administrativo
+              </Link>
+            )}
           </div>
         </div>
 
