@@ -5,12 +5,11 @@ import { useRouter } from 'next/navigation';
 import { MapPin, User, Lock, CreditCard, ArrowRight, CheckCircle, Loader2 } from 'lucide-react';
 
 import { db } from './firebase'; 
-// Agregamos getDoc para poder LEER los datos de Firebase
 import { doc, setDoc, getDoc } from 'firebase/firestore'; 
 
 export default function PortalInicio() {
   const router = useRouter(); 
-  const [esRegistro, setEsRegistro] = useState(false); // Cambié esto a false para que empiece en Iniciar Sesión
+  const [esRegistro, setEsRegistro] = useState(false);
 
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
@@ -24,7 +23,7 @@ export default function PortalInicio() {
 
     try {
       if (esRegistro) {
-        // MODO 1: CREAR CUENTA NUEVA (Lo que ya hicimos)
+        // MODO 1: CREAR CUENTA NUEVA
         await setDoc(doc(db, "colaboradores", documento), {
           nombre: nombre,
           apellido: apellido,
@@ -36,28 +35,30 @@ export default function PortalInicio() {
         });
         
         alert("¡Cuenta creada con éxito! Bienvenid@ a Vista al Vuelo.");
+        
+        // ✨ LÍNEA NUEVA: Entregamos el gafete al registrarse
+        localStorage.setItem('colaboradorActivo', documento); 
+        
         router.push('/progreso'); 
 
       } else {
-        // MODO 2: INICIAR SESIÓN (Lo nuevo ✨)
-        // 1. Buscamos el documento con esa cédula en Firebase
+        // MODO 2: INICIAR SESIÓN
         const docRef = doc(db, "colaboradores", documento);
         const docSnap = await getDoc(docRef);
 
-        // 2. Revisamos si la carpeta existe
         if (docSnap.exists()) {
           const datosDelColaborador = docSnap.data();
           
-          // 3. Revisamos si la contraseña coincide
           if (datosDelColaborador.password === password) {
-            // ¡Todo coincide! Le damos paso
+            
+            // ✨ LÍNEA NUEVA: Entregamos el gafete al iniciar sesión
+            localStorage.setItem('colaboradorActivo', documento);
+            
             router.push('/progreso');
           } else {
-            // Cédula correcta, pero contraseña equivocada
             alert("Contraseña incorrecta. Por favor, inténtalo de nuevo.");
           }
         } else {
-          // La cédula no está en la base de datos
           alert("No encontramos ningún colaborador registrado con ese número de documento.");
         }
       }

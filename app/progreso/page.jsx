@@ -1,176 +1,194 @@
 'use client';
 
-import React, { useState } from 'react';
-import { User, CheckCircle, PlayCircle, MapPin, FileText, Lock, ChevronDown, ChevronUp, BookOpen } from 'lucide-react';
-import Link from 'next/link';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { 
+  BookOpen, 
+  CheckCircle2, 
+  PlayCircle, 
+  Award, 
+  LogOut, 
+  BarChart3,
+  ChevronRight,
+  Clock
+} from 'lucide-react';
 
-export default function VistaAlVueloPortal() {
-  const [moduloAbierto, setModuloAbierto] = useState(1);
+// Importamos la conexión a Firebase
+import { db } from '../firebase'; 
+import { doc, getDoc } from 'firebase/firestore'; 
 
-  const curriculum = [
-    {
-      id: 1,
-      titulo: "Módulo 1: Conociendo nuestra empresa",
-      progreso: 100,
-      estado: "completado",
-      clases: [
-        { id: "1a", nombre: "Quiénes somos", tipo: "clase", estado: "completado" },
-        { id: "1b", nombre: "Examen: Quiénes somos", tipo: "examen", estado: "completado" },
-        { id: "1c", nombre: "Misión y visión", tipo: "clase", estado: "completado" },
-        { id: "1d", nombre: "Examen: Misión y visión", tipo: "examen", estado: "completado" },
-        { id: "1e", nombre: "Qué hacemos", tipo: "clase", estado: "completado" },
-        { id: "1f", nombre: "Examen: Qué hacemos", tipo: "examen", estado: "completado" },
-        { id: "1g", nombre: "Qué queremos", tipo: "clase", estado: "completado" },
-        { id: "1h", nombre: "Examen: Qué queremos", tipo: "examen", estado: "completado" },
-        { id: "1i", nombre: "Nuestros valores empresariales", tipo: "clase", estado: "completado" },
-        { id: "1j", nombre: "Examen: Valores", tipo: "examen", estado: "completado" },
-        { id: "1k", nombre: "EXAMEN FINAL", tipo: "final", estado: "completado" }
-      ]
-    },
-    {
-      id: 2,
-      titulo: "Módulo 2: Reglamento Interno",
-      progreso: 15,
-      estado: "en curso",
-      clases: [
-        { id: "2a", nombre: "Ingreso, Contratos y Jornadas", tipo: "clase", estado: "completado" },
-        { id: "2b", nombre: "Examen: Ingreso y Jornadas", tipo: "examen", estado: "en curso" },
-        { id: "2c", nombre: "Descansos, Vacaciones y Permisos", tipo: "clase", estado: "bloqueado" },
-        { id: "2d", nombre: "Examen: Descansos y Permisos", tipo: "examen", estado: "bloqueado" },
-        { id: "2e", nombre: "Salarios, Beneficios y Seguridad", tipo: "clase", estado: "bloqueado" },
-        { id: "2f", nombre: "Examen: Salarios y Seguridad", tipo: "examen", estado: "bloqueado" },
-        { id: "2g", nombre: "Obligaciones, Prohibiciones y Sanciones", tipo: "clase", estado: "bloqueado" },
-        { id: "2h", nombre: "Examen: Obligaciones y Sanciones", tipo: "examen", estado: "bloqueado" },
-        { id: "2i", nombre: "EXAMEN FINAL: Reglamento", tipo: "final", estado: "bloqueado" }
-      ]
-    },
-    {
-      id: 3, titulo: "Módulo 3: Capacitación Bar", progreso: 0, estado: "bloqueado",
-      clases: [
-        { id: "3a", nombre: "Coctelería", tipo: "clase", estado: "bloqueado" },
-        { id: "3b", nombre: "Licores", tipo: "clase", estado: "bloqueado" },
-        { id: "3g", nombre: "EXAMEN FINAL: Bar", tipo: "final", estado: "bloqueado" }
-      ]
-    },
-    {
-      id: 4, titulo: "Módulo 4: Preparación Alimentos", progreso: 0, estado: "bloqueado",
-      clases: [
-        { id: "4a", nombre: "Asadero y Arepas", tipo: "clase", estado: "bloqueado" },
-        { id: "4b", nombre: "Restaurante y Menú", tipo: "clase", estado: "bloqueado" },
-        { id: "4f", nombre: "EXAMEN FINAL: Alimentos", tipo: "final", estado: "bloqueado" }
-      ]
-    },
-    {
-      id: 5, titulo: "Módulo 5: Aseo y Mantenimiento", progreso: 0, estado: "bloqueado",
-      clases: [
-        { id: "5a", nombre: "Uso de Químicos", tipo: "clase", estado: "bloqueado" },
-        { id: "5b", nombre: "Manipulación y Protocolos", tipo: "clase", estado: "bloqueado" },
-        { id: "5e", nombre: "EXAMEN FINAL: Aseo", tipo: "final", estado: "bloqueado" }
-      ]
-    },
-    {
-      id: 6, titulo: "Módulo 6: Liderazgo y Cultura", progreso: 0, estado: "bloqueado",
-      clases: [
-        { id: "6a", nombre: "Administración básica", tipo: "clase", estado: "bloqueado" },
-        { id: "6b", nombre: "Compañeros y Respeto", tipo: "clase", estado: "bloqueado" },
-        { id: "6e", nombre: "EXAMEN FINAL: Liderazgo", tipo: "final", estado: "bloqueado" }
-      ]
-    }
-  ];
+export default function PaginaProgreso() {
+  const router = useRouter();
+  
+  // Estado para guardar los datos del colaborador
+  const [usuario, setUsuario] = useState({
+    nombre: 'Cargando...',
+    apellido: '',
+    progresoTotal: 0,
+    estado: ''
+  });
 
-  const toggleModulo = (id) => {
-    setModuloAbierto(moduloAbierto === id ? null : id);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    const obtenerDatosReales = async () => {
+      try {
+        // 1. Buscamos el "gafete" en la memoria del navegador
+        const documentoId = localStorage.getItem('colaboradorActivo');
+
+        if (!documentoId) {
+          // Si no hay nadie logueado, mandamos al inicio
+          router.push('/');
+          return;
+        }
+
+        // 2. Consultamos en Firebase los datos de esa cédula
+        const docRef = doc(db, "colaboradores", documentoId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          setUsuario(docSnap.data());
+        } else {
+          // Si por alguna razón el documento no existe, borramos memoria y fuera
+          localStorage.removeItem('colaboradorActivo');
+          router.push('/');
+        }
+      } catch (error) {
+        console.error("Error cargando datos:", error);
+      } finally {
+        setCargando(false);
+      }
+    };
+
+    obtenerDatosReales();
+  }, [router]);
+
+  const cerrarSesion = () => {
+    localStorage.removeItem('colaboradorActivo');
+    router.push('/');
   };
 
-  return (
-    <div className="min-h-screen bg-slate-50 font-sans pb-12">
-      <nav className="bg-slate-900 text-white p-4 shadow-xl border-b border-orange-500/30 sticky top-0 z-20">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <MapPin className="text-orange-500" /> VISTA AL VUELO
-          </h1>
-          <div className="text-[10px] font-bold uppercase tracking-widest bg-orange-500 px-3 py-1 rounded">
-            Portal de Inducción
-          </div>
+  if (cargando) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <div className="text-white flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="font-bold tracking-widest uppercase text-xs">Cargando tu progreso...</p>
         </div>
-      </nav>
+      </div>
+    );
+  }
 
-      <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-6">
-        <div className="bg-white rounded-3xl shadow-sm p-6 border border-slate-100 flex items-center gap-6">
-          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 border-2 border-slate-50 shadow-inner shrink-0">
-            <User size={40} />
-          </div>
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans pb-20">
+      {/* HEADER DE BIENVENIDA */}
+      <div className="bg-slate-900 text-white pt-12 pb-24 px-6 md:px-12 rounded-b-[3rem] shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-orange-500/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
+        
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center relative z-10 gap-6">
           <div>
-            <h2 className="text-2xl font-black text-slate-800">Nataly Martinez Orrego</h2>
-            <p className="text-orange-600 font-bold uppercase text-xs tracking-widest">Colaboradora en Entrenamiento</p>
-            <p className="text-sm text-slate-500 mt-1">Progreso Total: <strong className="text-slate-800">19%</strong></p>
+            <div className="flex items-center gap-2 text-orange-500 mb-4">
+              <BarChart3 size={20} />
+              <span className="text-xs font-black uppercase tracking-[0.2em]">Panel de Control</span>
+            </div>
+            <h1 className="text-3xl md:text-5xl font-black mb-2">
+              Hola, <span className="text-orange-500">{usuario.nombre}</span> 👋
+            </h1>
+            <p className="text-slate-400 font-medium">
+              Este es el avance de tu formación en <strong className="text-white">Vista al Vuelo</strong>.
+            </p>
           </div>
+
+          <button 
+            onClick={cerrarSesion}
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-sm font-bold transition-all border border-white/10"
+          >
+            <LogOut size={18} /> Cerrar Sesión
+          </button>
         </div>
+      </div>
+
+      {/* TARJETAS DE ESTADO */}
+      <div className="max-w-6xl mx-auto px-6 -mt-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          {/* Card: Progreso General */}
+          <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
+            <div className="flex justify-between items-center mb-6">
+              <div className="p-3 bg-orange-100 rounded-2xl text-orange-600">
+                <CheckCircle2 size={24} />
+              </div>
+              <span className="text-3xl font-black text-slate-800">{usuario.progresoTotal}%</span>
+            </div>
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Progreso Total</p>
+            <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+              <div 
+                className="bg-orange-500 h-full transition-all duration-1000" 
+                style={{ width: `${usuario.progresoTotal}%` }}
+              ></div>
+            </div>
+          </div>
+
+          {/* Card: Próximo Paso */}
+          <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
+            <div className="p-3 bg-blue-100 rounded-2xl text-blue-600 w-fit mb-6">
+              <PlayCircle size={24} />
+            </div>
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Siguiente Clase</p>
+            <h3 className="text-xl font-black text-slate-800">Introducción al Servicio</h3>
+          </div>
+
+          {/* Card: Logros */}
+          <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
+            <div className="p-3 bg-yellow-100 rounded-2xl text-yellow-600 w-fit mb-6">
+              <Award size={24} />
+            </div>
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Certificaciones</p>
+            <h3 className="text-xl font-black text-slate-800">
+              {usuario.progresoTotal === 100 ? '¡Certificado Disponible!' : '0 Completadas'}
+            </h3>
+          </div>
+
+        </div>
+      </div>
+
+      {/* LISTA DE MÓDULOS */}
+      <div className="max-w-4xl mx-auto px-6 mt-16">
+        <h2 className="text-2xl font-black text-slate-800 mb-8 flex items-center gap-3">
+          <BookOpen className="text-orange-500" /> Plan de Capacitación
+        </h2>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest px-2 mt-8">Ruta de Capacitación</h3>
-          
-          {curriculum.map((modulo) => (
-            <div key={modulo.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-              <button 
-                onClick={() => toggleModulo(modulo.id)}
-                className="w-full p-5 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors"
-              >
-                <div className="flex items-center gap-4 text-left">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    modulo.estado === 'completado' ? 'bg-green-100 text-green-600' :
-                    modulo.estado === 'en curso' ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'
-                  }`}>
-                    {modulo.estado === 'completado' ? <CheckCircle size={24} /> :
-                     modulo.estado === 'bloqueado' ? <Lock size={24} /> : <BookOpen size={24} />}
+          {[
+            { id: 1, titulo: "Bienvenida y Cultura Organizacional", duracion: "15 min", estado: "completado" },
+            { id: 2, titulo: "Protocolos de Seguridad en Parapente", duracion: "45 min", estado: "pendiente" },
+            { id: 3, titulo: "Atención al Cliente Premium", duracion: "30 min", estado: "bloqueado" },
+          ].map((modulo) => (
+            <div 
+              key={modulo.id}
+              className={`group flex items-center justify-between p-6 rounded-2xl border transition-all cursor-pointer
+                ${modulo.estado === 'completado' ? 'bg-white border-green-100' : 'bg-white border-slate-100 hover:border-orange-200'}
+              `}
+              onClick={() => modulo.estado !== 'bloqueado' && router.push('/clase')}
+            >
+              <div className="flex items-center gap-5">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black
+                  ${modulo.estado === 'completado' ? 'bg-green-50 text-green-600' : 'bg-slate-50 text-slate-400'}
+                `}>
+                  {modulo.estado === 'completado' ? <CheckCircle2 size={24} /> : modulo.id}
+                </div>
+                <div>
+                  <h4 className={`font-bold ${modulo.estado === 'bloqueado' ? 'text-slate-300' : 'text-slate-800'}`}>
+                    {modulo.titulo}
+                  </h4>
+                  <div className="flex items-center gap-3 text-xs text-slate-400 font-medium mt-1">
+                    <span className="flex items-center gap-1"><Clock size={12} /> {modulo.duracion}</span>
                   </div>
-                  <div>
-                    <h4 className={`font-bold text-lg ${modulo.estado === 'bloqueado' ? 'text-slate-400' : 'text-slate-800'}`}>
-                      {modulo.titulo}
-                    </h4>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">
-                      Progreso: {modulo.progreso}%
-                    </p>
-                  </div>
                 </div>
-                <div className="text-slate-400">
-                  {moduloAbierto === modulo.id ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
-                </div>
-              </button>
-
-              {moduloAbierto === modulo.id && (
-                <div className="p-4 bg-slate-50 border-t border-slate-100 grid gap-2">
-                  {modulo.clases.map((clase) => (
-                    <div key={clase.id} className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
-                      <div className="flex items-center gap-3">
-                        <div className={`${
-                          clase.estado === 'completado' ? 'text-green-500' : 
-                          clase.estado === 'bloqueado' ? 'text-slate-300' : 
-                          clase.tipo === 'examen' || clase.tipo === 'final' ? 'text-orange-500' : 'text-blue-500'
-                        }`}>
-                          {clase.estado === 'completado' ? <CheckCircle size={20} /> :
-                           clase.estado === 'bloqueado' ? <Lock size={20} /> :
-                           clase.tipo === 'clase' ? <PlayCircle size={20} /> : <FileText size={20} />}
-                        </div>
-                        <span className={`text-sm font-semibold ${clase.estado === 'bloqueado' ? 'text-slate-400' : 'text-slate-700'}`}>
-                          {clase.nombre}
-                        </span>
-                      </div>
-                      
-                      {clase.estado !== 'bloqueado' && (
-                        <Link 
-                          href={clase.tipo === 'clase' ? '/clase' : '/examen'} 
-                          className={`text-[10px] uppercase tracking-widest font-bold px-4 py-2 rounded-lg transition-colors ${
-                            clase.estado === 'completado' ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' :
-                            'bg-slate-900 text-white hover:bg-orange-600'
-                          }`}
-                        >
-                          {clase.estado === 'completado' ? 'Repasar' : clase.tipo === 'clase' ? 'Ver Clase' : 'Evaluar'}
-                        </Link>
-                      )}
-                    </div>
-                  ))}
-                </div>
+              </div>
+              
+              {modulo.estado !== 'bloqueado' && (
+                <ChevronRight className="text-slate-300 group-hover:text-orange-500 group-hover:translate-x-1 transition-all" />
               )}
             </div>
           ))}
