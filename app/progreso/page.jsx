@@ -88,7 +88,7 @@ export default function VistaAlVueloPortal() {
             <p className="text-sm text-slate-500 mt-2">Progreso Total: <strong className="text-slate-800">{usuario.progresoTotal}%</strong></p>
             
             {/* Recuerda poner tu cédula aquí si quieres que se vea el botón del Admin */}
-            {String(usuario.documento) === '1017172306' && (
+            {String(usuario.documento) === '1128459431' && (
               <Link href="/admin" className="mt-4 inline-flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-md">
                 <BarChart3 size={14} /> Panel Administrativo
               </Link>
