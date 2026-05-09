@@ -2,9 +2,37 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Timer, Send, CheckCircle2, Loader2, ChevronRight, XCircle, Info } from 'lucide-react';
+import { Timer, Send, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
+
+// ✅ NUEVO: función que mezcla preguntas y opciones aleatoriamente
+const mezclarPreguntas = (preguntas) => {
+  // Si no hay preguntas, devuelve array vacío
+  if (!preguntas || preguntas.length === 0) return [];
+
+  try {
+    const preguntasMezcladas = [...preguntas].sort(() => Math.random() - 0.5);
+
+    return preguntasMezcladas.map(pregunta => {
+      // Si no tiene opciones o correcta, devuelve la pregunta sin mezclar
+      if (!pregunta.opciones || pregunta.correcta === undefined) return pregunta;
+
+      const textoCorrecta = pregunta.opciones[Number(pregunta.correcta)];
+      const opcionesMezcladas = [...pregunta.opciones].sort(() => Math.random() - 0.5);
+      const nuevaCorrecta = opcionesMezcladas.indexOf(textoCorrecta);
+
+      return {
+        ...pregunta,
+        opciones: opcionesMezcladas,
+        correcta: nuevaCorrecta === -1 ? 0 : nuevaCorrecta
+      };
+    });
+  } catch (error) {
+    console.error("Error mezclando preguntas:", error);
+    return preguntas; // Si falla, devuelve las preguntas sin mezclar
+  }
+};
 
 function ContenidoDelExamen() {
   const router = useRouter();
@@ -25,7 +53,9 @@ function ContenidoDelExamen() {
         const docRef = doc(db, "curriculum", moduloId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          setPreguntas(docSnap.data().preguntas || []);
+          // ✅ CAMBIO: aplicamos la mezcla al cargar las preguntas
+          const preguntasAleatorias = mezclarPreguntas(docSnap.data().preguntas || []);
+          setPreguntas(preguntasAleatorias);
         }
       } catch (error) {
         console.error("🚨 Error de conexión:", error);
@@ -61,7 +91,6 @@ function ContenidoDelExamen() {
       setPuntaje(correctas);
 
       const documentoId = localStorage.getItem('colaboradorActivo');
-      
       if (documentoId) {
         const colaboradorRef = doc(db, "colaboradores", documentoId);
         await updateDoc(colaboradorRef, {
@@ -78,7 +107,6 @@ function ContenidoDelExamen() {
     }
   };
 
-  // ✅ CAMBIO APLICADO: ahora redirige a /portal en lugar de /
   const irAlInicio = () => {
     router.push('/progreso');
   };
@@ -105,9 +133,13 @@ function ContenidoDelExamen() {
               </div>
             )}
           </div>
-          
+
           {!examenFinalizado && (
-            <button onClick={finalizarExamen} disabled={enviando} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2">
+            <button
+              onClick={finalizarExamen}
+              disabled={enviando}
+              className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+            >
               {enviando ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} />} Terminar
             </button>
           )}
@@ -115,13 +147,15 @@ function ContenidoDelExamen() {
       </nav>
 
       <div className="max-w-3xl mx-auto p-6 mt-8 space-y-8">
-        
+
         {examenFinalizado && (
           <div className="bg-white p-8 rounded-[2rem] border-2 border-green-500 shadow-xl text-center">
             <h2 className="text-3xl font-black text-slate-900 mb-2">¡Resultados Listos!</h2>
-            <p className="text-slate-600 mb-6 font-medium">Acertaste {puntaje} de {preguntas.length} preguntas.</p>
-            <button 
-              onClick={irAlInicio} 
+            <p className="text-slate-600 mb-6 font-medium">
+              Acertaste {puntaje} de {preguntas.length} preguntas.
+            </p>
+            <button
+              onClick={irAlInicio}
               className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-orange-500 shadow-lg transition-all"
             >
               Cerrar y Volver al Portal
@@ -131,14 +165,16 @@ function ContenidoDelExamen() {
 
         {preguntas.map((p, pIndex) => (
           <div key={pIndex} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
-            <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Pregunta {pIndex + 1}</span>
+            <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">
+              Pregunta {pIndex + 1}
+            </span>
             <h3 className="text-xl font-bold text-slate-800 mt-2 mb-6 leading-tight">{p.enunciado}</h3>
-            
+
             <div className="grid gap-3">
               {p.opciones && p.opciones.map((opcion, oIndex) => {
                 let colorClase = 'border-slate-100 hover:border-slate-200 text-slate-600';
                 let Icono = null;
-                
+
                 if (examenFinalizado) {
                   if (oIndex === p.correcta) {
                     colorClase = 'border-green-500 bg-green-50 text-green-700';
@@ -163,11 +199,12 @@ function ContenidoDelExamen() {
                     <span>{opcion}</span>
                     {Icono}
                   </button>
-                )
+                );
               })}
             </div>
           </div>
         ))}
+
       </div>
     </div>
   );
@@ -175,7 +212,11 @@ function ContenidoDelExamen() {
 
 export default function PaginaExamen() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center text-white"><Loader2 className="animate-spin" size={48} /></div>}>
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
+        <Loader2 className="animate-spin" size={48} />
+      </div>
+    }>
       <ContenidoDelExamen />
     </Suspense>
   );

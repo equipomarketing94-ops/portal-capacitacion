@@ -6,16 +6,17 @@ import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { 
   ArrowLeft, 
+  ArrowRight,
   CheckCircle, 
-  ChevronRight, 
-  FileText, 
+  XCircle,
   Loader2,
   BookOpen,
   Scale,
   AlertTriangle,
   ShieldCheck,
   Users,
-  Map
+  Map,
+  Play
 } from 'lucide-react';
 
 const obtenerIcono = (icono) => {
@@ -33,25 +34,42 @@ const obtenerIcono = (icono) => {
 export default function ClasePage() {
   const router = useRouter();
   const [modulo, setModulo] = useState(null);
+  const [colaborador, setColaborador] = useState(null);
   const [cargando, setCargando] = useState(true);
-  const [videoFinalizado, setVideoFinalizado] = useState(false);
+  const [pasoActual, setPasoActual] = useState(0);
+  const [respuestas, setRespuestas] = useState({});
 
   useEffect(() => {
-    const cargarModulo = async () => {
+    const cargarDatos = async () => {
       try {
         const docRef = doc(db, "curriculum", "modulo_1");
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setModulo(docSnap.data());
         }
+
+        const idGuardado = localStorage.getItem('colaboradorActivo');
+        if (idGuardado) {
+          const colRef = doc(db, "colaboradores", idGuardado);
+          const colSnap = await getDoc(colRef);
+          if (colSnap.exists()) {
+            setColaborador(colSnap.data());
+          }
+        }
+
       } catch (error) {
         console.error("Error cargando módulo:", error);
       } finally {
         setCargando(false);
       }
     };
-    cargarModulo();
+    cargarDatos();
   }, []);
+
+  const responder = (pasoIndex, opcionIndex) => {
+    if (respuestas[pasoIndex] !== undefined) return;
+    setRespuestas({ ...respuestas, [pasoIndex]: opcionIndex });
+  };
 
   if (cargando) return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center text-white">
@@ -60,154 +78,204 @@ export default function ClasePage() {
     </div>
   );
 
+  const totalPasos = 1 + (modulo?.secciones?.length || 0) + 1;
+  const esUltimoPaso = pasoActual === totalPasos - 1;
+
+  const puedeAvanzar = () => {
+    if (pasoActual === 0) return true;
+    const seccionIndex = pasoActual - 1;
+    const secciones = modulo?.secciones || [];
+    if (pasoActual <= secciones.length) {
+      const seccion = secciones[seccionIndex];
+      if (seccion?.pregunta) {
+        return respuestas[pasoActual] !== undefined;
+      }
+      return true;
+    }
+    return true;
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-white font-sans pb-20">
 
       <nav className="p-4 border-b border-slate-800 bg-slate-900 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto flex items-center gap-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
           <button onClick={() => router.push('/progreso')} className="text-slate-400 hover:text-white transition-colors">
             <ArrowLeft size={24} />
           </button>
-          <div>
+          <div className="text-center">
             <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest">Módulo 1</p>
-            <h1 className="text-lg font-bold">{modulo?.titulo || 'Cargando...'}</h1>
+            <h1 className="text-sm font-bold">{modulo?.titulo || 'Cargando...'}</h1>
+          </div>
+          <div className="text-[10px] font-black text-slate-400">
+            {pasoActual + 1} / {totalPasos}
+          </div>
+        </div>
+        <div className="max-w-4xl mx-auto mt-3">
+          <div className="w-full bg-slate-700 rounded-full h-1">
+            <div
+              className="bg-orange-500 h-1 rounded-full transition-all duration-500"
+              style={{ width: `${((pasoActual + 1) / totalPasos) * 100}%` }}
+            />
           </div>
         </div>
       </nav>
 
-      <main className="max-w-5xl mx-auto p-4 lg:p-8 space-y-10">
+      <main className="max-w-3xl mx-auto p-4 lg:p-8 space-y-8">
 
-        {/* OBJETIVO */}
-        {modulo?.objetivo && (
-          <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-6">
-            <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-2">Objetivo</p>
-            <p className="text-slate-300 leading-relaxed">{modulo.objetivo}</p>
+        {/* PASO 0: OBJETIVO + VIDEO */}
+        {pasoActual === 0 && (
+          <div className="space-y-6">
+            {modulo?.objetivo && (
+              <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-6">
+                <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-2">Objetivo</p>
+                <p className="text-slate-300 leading-relaxed">{modulo.objetivo}</p>
+              </div>
+            )}
+            {modulo?.videoUrl && (
+              <div className="space-y-3">
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-4 flex items-center gap-3">
+                  <Play size={18} className="text-blue-400 shrink-0" />
+                  <p className="text-blue-300 text-sm font-medium">
+                    Revisa el video completo para continuar con la clase.
+                  </p>
+                </div>
+                <div className="aspect-video rounded-2xl overflow-hidden border border-slate-700 shadow-2xl">
+                  <iframe
+                    src={modulo.videoUrl}
+                    title="Video del módulo"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-full"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* VIDEO */}
-        {modulo?.videoUrl && (
-          <div className="space-y-3">
-            <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Video de la Capacitación</p>
-            <div className="aspect-video rounded-2xl overflow-hidden border border-slate-700 shadow-2xl">
-              <iframe
-                src={modulo.videoUrl}
-                title="Video del módulo"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="w-full h-full"
-              />
-            </div>
-          </div>
-        )}
+        {/* PASOS 1 a N: SECCIONES */}
+        {pasoActual >= 1 && pasoActual <= (modulo?.secciones?.length || 0) && (() => {
+          const seccion = modulo.secciones[pasoActual - 1];
+          const yaRespondio = respuestas[pasoActual] !== undefined;
+          const respuestaUsuario = respuestas[pasoActual];
 
-        {/* SECCIONES DE CONTENIDO */}
-        {modulo?.secciones && modulo.secciones.length > 0 && (
-          <div className="space-y-4">
-            <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Contenido del Módulo</p>
-            {modulo.secciones.map((seccion, index) => (
-              <div key={index} className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
-                <div className="flex items-center gap-3 mb-3">
+          return (
+            <div className="space-y-6">
+              <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
+                <div className="flex items-center gap-3 mb-4">
                   {obtenerIcono(seccion.icono)}
-                  <h3 className="font-black text-white">{seccion.titulo}</h3>
+                  <h3 className="font-black text-white text-lg">{seccion.titulo}</h3>
                 </div>
                 <p className="text-slate-400 leading-relaxed whitespace-pre-line">{seccion.contenido}</p>
               </div>
-            ))}
-          </div>
-        )}
 
-        {/* CASO PRÁCTICO CON PREGUNTAS DE REFLEXIÓN */}
-        {modulo?.casoPractico && (
+              {seccion?.pregunta && (
+                <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700 space-y-4">
+                  <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">
+                    Pregunta de comprensión
+                  </p>
+                  <h4 className="font-bold text-white">{seccion.pregunta.enunciado}</h4>
+                  <div className="space-y-3">
+                    {seccion.pregunta.opciones.map((opcion, oIndex) => {
+                      let estilo = 'border-slate-600 text-slate-400';
+                      let icono = null;
+
+                      if (yaRespondio) {
+                        if (oIndex === seccion.pregunta.correcta) {
+                          estilo = 'border-green-500 bg-green-500/10 text-green-400';
+                          icono = <CheckCircle size={18} className="text-green-500 shrink-0" />;
+                        } else if (oIndex === respuestaUsuario) {
+                          estilo = 'border-red-500 bg-red-500/10 text-red-400';
+                          icono = <XCircle size={18} className="text-red-500 shrink-0" />;
+                        } else {
+                          estilo = 'border-slate-700 text-slate-600 opacity-50';
+                        }
+                      } else if (respuestaUsuario === oIndex) {
+                        estilo = 'border-orange-500 bg-orange-500/10 text-orange-400';
+                      }
+
+                      return (
+                        <button
+                          key={oIndex}
+                          onClick={() => responder(pasoActual, oIndex)}
+                          disabled={yaRespondio}
+                          className={`w-full p-4 text-left border-2 rounded-xl transition-all font-medium flex items-center justify-between gap-3 ${estilo}`}
+                        >
+                          <span>{opcion}</span>
+                          {icono}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {yaRespondio && seccion.pregunta.explicacion && (
+                    <div className="mt-4 p-4 bg-blue-500/10 border-l-4 border-blue-500 rounded-r-xl">
+                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">
+                        Retroalimentación
+                      </p>
+                      <p className="text-blue-300 text-sm leading-relaxed">
+                        {seccion.pregunta.explicacion}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ÚLTIMO PASO: CASO PRÁCTICO */}
+        {esUltimoPaso && modulo?.casoPractico && (
           <div className="space-y-6">
-
             <div className="bg-slate-800 rounded-2xl p-6 border-l-4 border-orange-500">
               <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-2">Caso Práctico</p>
               <h3 className="text-lg font-black text-white mb-4">{modulo.casoPractico.titulo}</h3>
               <p className="text-slate-400 leading-relaxed">{modulo.casoPractico.relato}</p>
             </div>
-
-            {modulo?.preguntasReflexion && modulo.preguntasReflexion.length > 0 && (
-              <div className="space-y-4">
-                <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">
-                  Preguntas de Reflexión
-                </p>
-                {modulo.preguntasReflexion.map((pregunta, pIndex) => (
-                  <div key={pIndex} className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                      Pregunta {pIndex + 1}
-                    </p>
-                    <h4 className="font-bold text-white mb-4">{pregunta.enunciado}</h4>
-                    <div className="space-y-2">
-                      {pregunta.opciones && pregunta.opciones.map((opcion, oIndex) => (
-                        <div
-                          key={oIndex}
-                          className="p-3 rounded-xl border border-slate-600 text-slate-400 text-sm font-medium"
-                        >
-                          {opcion}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                <p className="text-slate-500 text-sm text-center italic">
-                  Reflexiona sobre estas preguntas — las encontrarás en tu evaluación.
-                </p>
-              </div>
-            )}
-
-          </div>
-        )}
-
-        {/* MATERIAL DE APOYO */}
-        {modulo?.materiales && modulo.materiales.length > 0 && (
-          <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
-            <h3 className="font-bold mb-4 flex items-center gap-2">
-              <FileText size={18} className="text-orange-500" /> Material de Apoyo
-            </h3>
-            <div className="space-y-3">
-              {modulo.materiales.map((material, index) => (
-                <a
-                  key={index}
-                  href={material.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full text-left p-3 rounded-lg bg-slate-900/50 hover:bg-slate-700 transition-colors text-sm border border-slate-700 flex justify-between items-center group"
-                >
-                  {material.nombre}
-                  <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                </a>
-              ))}
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-2xl p-5">
+              <p className="text-orange-300 text-sm font-medium text-center">
+                ¡Completaste el contenido! Espera a que tu administrador habilite el examen.
+              </p>
             </div>
           </div>
         )}
 
-        {/* BOTÓN COMPLETAR Y IR AL EXAMEN */}
-        <div className={`rounded-2xl p-6 shadow-lg transition-all ${videoFinalizado ? 'bg-green-600' : 'bg-orange-600'}`}>
-          <h3 className="font-bold mb-2">
-            {videoFinalizado ? '¡Listo para el examen!' : '¿Terminaste el módulo?'}
-          </h3>
-          <p className="text-sm mb-4 opacity-90">
-            {videoFinalizado
-              ? 'Ya puedes presentar tu evaluación.'
-              : 'Marca el módulo como completado para acceder al examen.'}
-          </p>
-          {!videoFinalizado ? (
+        {/* NAVEGACIÓN */}
+        <div className="flex items-center justify-between pt-4">
+
+          <button
+            onClick={() => setPasoActual(pasoActual - 1)}
+            disabled={pasoActual === 0}
+            className="flex items-center gap-2 px-6 py-3 rounded-xl border-2 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-white transition-all disabled:opacity-20 disabled:cursor-not-allowed font-bold"
+          >
+            <ArrowLeft size={18} /> Anterior
+          </button>
+
+          {!esUltimoPaso ? (
             <button
-              onClick={() => setVideoFinalizado(true)}
-              className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-white text-orange-600 hover:bg-orange-50 transition-all"
+              onClick={() => puedeAvanzar() && setPasoActual(pasoActual + 1)}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${
+                puedeAvanzar()
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white'
+                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+              }`}
             >
-              Marcar como completado
+              Siguiente <ArrowRight size={18} />
             </button>
-          ) : (
+          ) : colaborador?.examenHabilitado ? (
             <button
               onClick={() => router.push('/examen?modulo=modulo_1')}
-              className="w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 bg-white text-green-600 hover:bg-green-50 transition-all"
+              className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-green-500 hover:bg-green-600 text-white transition-all"
             >
-              <CheckCircle size={20} />
-              Presentar Examen
+              Ir al Examen <ArrowRight size={18} />
             </button>
+          ) : (
+            <div className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-slate-700 text-slate-400 cursor-not-allowed">
+              Examen no habilitado aún
+            </div>
           )}
+
         </div>
 
       </main>
