@@ -6,22 +6,15 @@ import { Timer, Send, CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, updateDoc, increment } from 'firebase/firestore';
 
-// ✅ NUEVO: función que mezcla preguntas y opciones aleatoriamente
 const mezclarPreguntas = (preguntas) => {
-  // Si no hay preguntas, devuelve array vacío
   if (!preguntas || preguntas.length === 0) return [];
-
   try {
     const preguntasMezcladas = [...preguntas].sort(() => Math.random() - 0.5);
-
     return preguntasMezcladas.map(pregunta => {
-      // Si no tiene opciones o correcta, devuelve la pregunta sin mezclar
       if (!pregunta.opciones || pregunta.correcta === undefined) return pregunta;
-
       const textoCorrecta = pregunta.opciones[Number(pregunta.correcta)];
       const opcionesMezcladas = [...pregunta.opciones].sort(() => Math.random() - 0.5);
       const nuevaCorrecta = opcionesMezcladas.indexOf(textoCorrecta);
-
       return {
         ...pregunta,
         opciones: opcionesMezcladas,
@@ -30,7 +23,7 @@ const mezclarPreguntas = (preguntas) => {
     });
   } catch (error) {
     console.error("Error mezclando preguntas:", error);
-    return preguntas; // Si falla, devuelve las preguntas sin mezclar
+    return preguntas;
   }
 };
 
@@ -53,7 +46,6 @@ function ContenidoDelExamen() {
         const docRef = doc(db, "curriculum", moduloId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
-          // ✅ CAMBIO: aplicamos la mezcla al cargar las preguntas
           const preguntasAleatorias = mezclarPreguntas(docSnap.data().preguntas || []);
           setPreguntas(preguntasAleatorias);
         }
@@ -90,16 +82,29 @@ function ContenidoDelExamen() {
       });
       setPuntaje(correctas);
 
+      // ✅ MÍNIMO 20 DE 29 PARA APROBAR
+      const aprobado = correctas >= 20;
       const documentoId = localStorage.getItem('colaboradorActivo');
+
       if (documentoId) {
         const colaboradorRef = doc(db, "colaboradores", documentoId);
         await updateDoc(colaboradorRef, {
           progresoTotal: increment(20),
-          examenHabilitado: false
+          examenHabilitado: false,
+          ultimoExamen: {
+            puntaje: correctas,
+            total: preguntas.length,
+            aprobado: aprobado,
+            fecha: new Date().toLocaleDateString('es-CO', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
+            })
+          }
         });
       }
     } catch (error) {
-      console.log("⚠️ No se pudo guardar progreso, pero finalizaremos el examen igual.");
+      console.log("⚠️ No se pudo guardar progreso.");
     } finally {
       setExamenFinalizado(true);
       setEnviando(false);
@@ -148,28 +153,52 @@ function ContenidoDelExamen() {
 
       <div className="max-w-3xl mx-auto p-6 mt-8 space-y-8">
 
+        {/* ✅ BLOQUE DE RESULTADOS CON MÍNIMO 20 */}
         {examenFinalizado && (
-          <div className="bg-white p-8 rounded-[2rem] border-2 border-green-500 shadow-xl text-center">
-            <h2 className="text-3xl font-black text-slate-900 mb-2">¡Resultados Listos!</h2>
-            <p className="text-slate-600 mb-6 font-medium">
-              Acertaste {puntaje} de {preguntas.length} preguntas.
-            </p>
+          <div className={`bg-white p-8 rounded-[2rem] border-2 shadow-xl text-center ${puntaje >= 20 ? 'border-green-500' : 'border-red-400'}`}>
+            {puntaje >= 20 ? (
+              <>
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 className="text-green-500" size={40} />
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 mb-2">¡Examen Aprobado!</h2>
+                <p className="text-slate-600 mb-2 font-medium">
+                  Obtuviste <strong>{puntaje} de {preguntas.length}</strong> respuestas correctas.
+                </p>
+                <p className="text-green-600 font-bold mb-6">
+                  Habla con tu administrador para recibir tu certificado.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <XCircle className="text-red-500" size={40} />
+                </div>
+                <h2 className="text-3xl font-black text-slate-900 mb-2">Examen No Aprobado</h2>
+                <p className="text-slate-600 mb-2 font-medium">
+                  Obtuviste <strong>{puntaje} de {preguntas.length}</strong> respuestas correctas.
+                </p>
+                <p className="text-red-500 font-bold mb-6">
+                  Necesitas mínimo 20 respuestas correctas. Habla con tu administrador para repetirlo.
+                </p>
+              </>
+            )}
             <button
               onClick={irAlInicio}
               className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-orange-500 shadow-lg transition-all"
             >
-              Cerrar y Volver al Portal
+              Volver al Portal
             </button>
           </div>
         )}
 
+        {/* PREGUNTAS */}
         {preguntas.map((p, pIndex) => (
           <div key={pIndex} className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-sm">
             <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">
               Pregunta {pIndex + 1}
             </span>
             <h3 className="text-xl font-bold text-slate-800 mt-2 mb-6 leading-tight">{p.enunciado}</h3>
-
             <div className="grid gap-3">
               {p.opciones && p.opciones.map((opcion, oIndex) => {
                 let colorClase = 'border-slate-100 hover:border-slate-200 text-slate-600';
