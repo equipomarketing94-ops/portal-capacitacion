@@ -56,7 +56,6 @@ export default function ClasePage() {
             setColaborador(colSnap.data());
           }
         }
-
       } catch (error) {
         console.error("Error cargando módulo:", error);
       } finally {
@@ -168,6 +167,19 @@ export default function ClasePage() {
                   <h3 className="font-black text-white text-lg">{seccion.titulo}</h3>
                 </div>
                 <p className="text-slate-400 leading-relaxed whitespace-pre-line">{seccion.contenido}</p>
+
+                {/* ✅ NUEVO: Video por sección */}
+                {seccion?.videoUrl && (
+                  <div className="mt-4 aspect-video rounded-xl overflow-hidden border border-slate-700">
+                    <iframe
+                      src={seccion.videoUrl}
+                      title={seccion.titulo}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full h-full"
+                    />
+                  </div>
+                )}
               </div>
 
               {seccion?.pregunta && (
@@ -243,7 +255,6 @@ export default function ClasePage() {
 
         {/* NAVEGACIÓN */}
         <div className="flex items-center justify-between pt-4">
-
           <button
             onClick={() => setPasoActual(pasoActual - 1)}
             disabled={pasoActual === 0}
@@ -275,7 +286,6 @@ export default function ClasePage() {
               Examen no habilitado aún
             </div>
           )}
-
         </div>
 
       </main>
