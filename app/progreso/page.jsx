@@ -39,9 +39,11 @@ export default function PaginaProgreso() {
 
         // ✅ NUEVO: Carga módulos desde Firebase
         const modulosSnap = await getDocs(collection(db, "curriculum"));
+        console.log("Total docs encontrados:", modulosSnap.docs.length);
         const listaModulos = modulosSnap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .sort((a, b) => a.id.localeCompare(b.id)); // ordena por ID
+  .map(d => ({ id: d.id, ...d.data() }))
+  .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+        console.log("📦 Módulos:", listaModulos);
         setModulos(listaModulos);
 
       } catch (error) {
