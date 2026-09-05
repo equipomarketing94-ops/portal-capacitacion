@@ -168,7 +168,7 @@ export default function ClasePage() {
                 </div>
                 <p className="text-slate-400 leading-relaxed whitespace-pre-line">{seccion.contenido}</p>
 
-                {/* ✅ NUEVO: Video por sección */}
+                {/* Video por sección */}
                 {seccion?.videoUrl && (
                   <div className="mt-4 aspect-video rounded-xl overflow-hidden border border-slate-700">
                     <iframe
@@ -178,6 +178,24 @@ export default function ClasePage() {
                       allowFullScreen
                       className="w-full h-full"
                     />
+                  </div>
+                )}
+
+                {/* ✅ NUEVO: Imágenes por sección */}
+                {seccion?.imagenes && seccion.imagenes.length > 0 && (
+                  <div className="mt-4 space-y-3">
+                    {seccion.imagenes.map((url, imgIndex) => (
+                      url ? (
+                        <div key={imgIndex} className="rounded-xl overflow-hidden border border-slate-700">
+                          <img
+                            src={url}
+                            alt={`${seccion.titulo} - imagen ${imgIndex + 1}`}
+                            className="w-full object-contain max-h-96"
+                            onError={e => e.target.parentElement.style.display = 'none'}
+                          />
+                        </div>
+                      ) : null
+                    ))}
                   </div>
                 )}
               </div>

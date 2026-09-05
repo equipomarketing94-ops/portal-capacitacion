@@ -5,11 +5,11 @@ import {
   Users, TrendingUp, Award, Search, BarChart3, Loader2, 
   ArrowLeft, Unlock, Lock, CheckCircle, XCircle, Printer,
   Plus, Trash2, Save, BookOpen, Video, FileText, 
-  HelpCircle, Edit3, ToggleLeft, ToggleRight
+  HelpCircle, Edit3, ToggleLeft, ToggleRight, Image
 } from 'lucide-react';
 import Link from 'next/link';
 import { db } from '../firebase';
-import { collection, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, setDoc, deleteDoc } from 'firebase/firestore';
 
 // ==================== CERTIFICADO ====================
 function Certificado({ colaborador, numeroCertificado, onCerrar }) {
@@ -82,13 +82,14 @@ function Certificado({ colaborador, numeroCertificado, onCerrar }) {
 // ==================== GESTOR DE MÓDULOS ====================
 const moduloInicial = {
   id: '', titulo: '', objetivo: '', videoUrl: '',
+  tieneCertificado: false,
   secciones: [], casoPractico: { titulo: '', relato: '' },
   preguntas: [], materiales: []
 };
 
-// ✅ CAMBIO: agregamos videoUrl a seccionInicial
 const seccionInicial = {
-  icono: 'definicion', titulo: '', contenido: '', videoUrl: '', tienePregunta: false,
+  icono: 'definicion', titulo: '', contenido: '', videoUrl: '',
+  imagenes: [], tienePregunta: false,
   pregunta: { enunciado: '', opciones: ['', '', '', ''], correcta: 0, explicacion: '' }
 };
 
@@ -127,11 +128,12 @@ function GestorModulos() {
   const iniciarEdicion = (modulo) => {
     setModuloActual({
       ...modulo,
+      tieneCertificado: modulo.tieneCertificado || false,
       casoPractico: modulo.casoPractico || { titulo: '', relato: '' },
-      // ✅ CAMBIO: incluimos videoUrl al cargar cada sección
       secciones: (modulo.secciones || []).map(s => ({
         ...s,
         videoUrl: s.videoUrl || '',
+        imagenes: s.imagenes || [],
         tienePregunta: !!s.pregunta,
         pregunta: s.pregunta || { enunciado: '', opciones: ['', '', '', ''], correcta: 0, explicacion: '' }
       })),
@@ -150,19 +152,48 @@ function GestorModulos() {
     setVista('formulario');
   };
 
+  // ✅ NUEVO: Eliminar módulo con confirmación
+  const eliminarModulo = async (modulo) => {
+    const confirmacion = window.confirm(`¿Estás seguro que deseas eliminar el módulo "${modulo.titulo}"? Esta acción no se puede deshacer.`);
+    if (!confirmacion) return;
+    try {
+      await deleteDoc(doc(db, "curriculum", modulo.id));
+      await cargarModulos();
+    } catch (error) {
+      alert("No se pudo eliminar el módulo.");
+    }
+  };
+
   const toggleSeccion = (seccion) => setSeccionesActivas(prev => ({ ...prev, [seccion]: !prev[seccion] }));
 
-  const agregarSeccion = () => setModuloActual(prev => ({ ...prev, secciones: [...prev.secciones, { ...seccionInicial, pregunta: { enunciado: '', opciones: ['', '', '', ''], correcta: 0, explicacion: '' } }] }));
+  // — Secciones —
+  const agregarSeccion = () => setModuloActual(prev => ({ ...prev, secciones: [...prev.secciones, { ...seccionInicial, imagenes: [], pregunta: { enunciado: '', opciones: ['', '', '', ''], correcta: 0, explicacion: '' } }] }));
   const eliminarSeccion = (i) => setModuloActual(prev => ({ ...prev, secciones: prev.secciones.filter((_, idx) => idx !== i) }));
   const actualizarSeccion = (i, campo, valor) => setModuloActual(prev => ({ ...prev, secciones: prev.secciones.map((s, idx) => idx === i ? { ...s, [campo]: valor } : s) }));
   const actualizarPreguntaSeccion = (si, campo, valor) => setModuloActual(prev => ({ ...prev, secciones: prev.secciones.map((s, i) => i === si ? { ...s, pregunta: { ...s.pregunta, [campo]: valor } } : s) }));
   const actualizarOpcionSeccion = (si, oi, valor) => setModuloActual(prev => ({ ...prev, secciones: prev.secciones.map((s, i) => i === si ? { ...s, pregunta: { ...s.pregunta, opciones: s.pregunta.opciones.map((o, j) => j === oi ? valor : o) } } : s) }));
 
+  // ✅ NUEVO: Imágenes por sección
+  const agregarImagenSeccion = (si) => setModuloActual(prev => ({
+    ...prev,
+    secciones: prev.secciones.map((s, i) => i === si ? { ...s, imagenes: [...(s.imagenes || []), ''] } : s)
+  }));
+  const eliminarImagenSeccion = (si, imgIndex) => setModuloActual(prev => ({
+    ...prev,
+    secciones: prev.secciones.map((s, i) => i === si ? { ...s, imagenes: s.imagenes.filter((_, j) => j !== imgIndex) } : s)
+  }));
+  const actualizarImagenSeccion = (si, imgIndex, valor) => setModuloActual(prev => ({
+    ...prev,
+    secciones: prev.secciones.map((s, i) => i === si ? { ...s, imagenes: s.imagenes.map((img, j) => j === imgIndex ? valor : img) } : s)
+  }));
+
+  // — Preguntas —
   const agregarPregunta = () => setModuloActual(prev => ({ ...prev, preguntas: [...prev.preguntas, { enunciado: '', opciones: ['', '', '', ''], correcta: 0, explicacion: '' }] }));
   const eliminarPregunta = (i) => setModuloActual(prev => ({ ...prev, preguntas: prev.preguntas.filter((_, idx) => idx !== i) }));
   const actualizarPregunta = (i, campo, valor) => setModuloActual(prev => ({ ...prev, preguntas: prev.preguntas.map((p, idx) => idx === i ? { ...p, [campo]: valor } : p) }));
   const actualizarOpcionPregunta = (pi, oi, valor) => setModuloActual(prev => ({ ...prev, preguntas: prev.preguntas.map((p, i) => i === pi ? { ...p, opciones: p.opciones.map((o, j) => j === oi ? valor : o) } : p) }));
 
+  // — Materiales —
   const agregarMaterial = () => setModuloActual(prev => ({ ...prev, materiales: [...prev.materiales, { nombre: '', url: '' }] }));
   const eliminarMaterial = (i) => setModuloActual(prev => ({ ...prev, materiales: prev.materiales.filter((_, idx) => idx !== i) }));
   const actualizarMaterial = (i, campo, valor) => setModuloActual(prev => ({ ...prev, materiales: prev.materiales.map((m, idx) => idx === i ? { ...m, [campo]: valor } : m) }));
@@ -174,14 +205,20 @@ function GestorModulos() {
     }
     setGuardando(true);
     try {
-      const datos = { titulo: moduloActual.titulo };
+      const datos = {
+        titulo: moduloActual.titulo,
+        tieneCertificado: moduloActual.tieneCertificado || false
+      };
       if (seccionesActivas.objetivo) datos.objetivo = moduloActual.objetivo;
       if (seccionesActivas.video) datos.videoUrl = moduloActual.videoUrl;
       if (seccionesActivas.secciones) {
         datos.secciones = moduloActual.secciones.map(s => {
           const sec = { icono: s.icono, titulo: s.titulo, contenido: s.contenido };
-          // ✅ CAMBIO: guardamos videoUrl si existe
           if (s.videoUrl) sec.videoUrl = s.videoUrl;
+          // ✅ NUEVO: guardamos imágenes si existen
+          if (s.imagenes && s.imagenes.length > 0) {
+            sec.imagenes = s.imagenes.filter(url => url.trim() !== '');
+          }
           if (s.tienePregunta) sec.pregunta = s.pregunta;
           return sec;
         });
@@ -211,6 +248,7 @@ function GestorModulos() {
     </button>
   );
 
+  // VISTA LISTA
   if (vista === 'lista') return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -239,12 +277,23 @@ function GestorModulos() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800">{modulo.titulo}</h3>
-                  <p className="text-xs text-slate-400">ID: {modulo.id}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-slate-400">ID: {modulo.id}</p>
+                    {modulo.tieneCertificado && (
+                      <span className="text-xs bg-green-100 text-green-600 font-bold px-2 py-0.5 rounded-full">Con certificado</span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <button onClick={() => iniciarEdicion(modulo)} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold text-sm transition-all">
-                <Edit3 size={14} /> Editar
-              </button>
+              {/* ✅ NUEVO: Botones editar y eliminar */}
+              <div className="flex items-center gap-2">
+                <button onClick={() => iniciarEdicion(modulo)} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold text-sm transition-all">
+                  <Edit3 size={14} /> Editar
+                </button>
+                <button onClick={() => eliminarModulo(modulo)} className="flex items-center gap-2 bg-red-50 hover:bg-red-100 text-red-500 px-4 py-2 rounded-xl font-bold text-sm transition-all">
+                  <Trash2 size={14} /> Eliminar
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -252,6 +301,7 @@ function GestorModulos() {
     </div>
   );
 
+  // VISTA FORMULARIO
   return (
     <div className="space-y-6 pb-12">
       <div className="flex items-center justify-between">
@@ -270,6 +320,7 @@ function GestorModulos() {
         </button>
       </div>
 
+      {/* DATOS BÁSICOS */}
       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
         <h3 className="font-black text-slate-800 flex items-center gap-2"><BookOpen size={18} className="text-orange-500" /> Datos Básicos</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -283,8 +334,20 @@ function GestorModulos() {
             <input type="text" placeholder="ej: Acoso Laboral" value={moduloActual.titulo} onChange={e => setModuloActual(prev => ({ ...prev, titulo: e.target.value }))} className={inputClase} />
           </div>
         </div>
+        {/* ✅ NUEVO: Toggle de certificado */}
+        <div>
+          <label className={labelClase}>¿Este módulo tiene certificado?</label>
+          <button
+            onClick={() => setModuloActual(prev => ({ ...prev, tieneCertificado: !prev.tieneCertificado }))}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${moduloActual.tieneCertificado ? 'bg-green-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+          >
+            {moduloActual.tieneCertificado ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+            {moduloActual.tieneCertificado ? 'Con Certificado' : 'Sin Certificado'}
+          </button>
+        </div>
       </div>
 
+      {/* TOGGLES DE SECCIONES */}
       <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
         <h3 className="font-black text-slate-800 mb-4">¿Qué secciones incluye este módulo?</h3>
         <div className="flex flex-wrap gap-3">
@@ -297,6 +360,7 @@ function GestorModulos() {
         </div>
       </div>
 
+      {/* OBJETIVO */}
       {seccionesActivas.objetivo && (
         <div className="bg-white p-6 rounded-3xl border border-orange-200 shadow-sm space-y-3">
           <h3 className="font-black text-slate-800">Objetivo del Módulo</h3>
@@ -304,6 +368,7 @@ function GestorModulos() {
         </div>
       )}
 
+      {/* VIDEO PRINCIPAL */}
       {seccionesActivas.video && (
         <div className="bg-white p-6 rounded-3xl border border-orange-200 shadow-sm space-y-3">
           <h3 className="font-black text-slate-800 flex items-center gap-2"><Video size={18} className="text-orange-500" /> URL del Video Principal</h3>
@@ -312,6 +377,7 @@ function GestorModulos() {
         </div>
       )}
 
+      {/* SECCIONES DE CONTENIDO */}
       {seccionesActivas.secciones && (
         <div className="bg-white p-6 rounded-3xl border border-orange-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
@@ -349,17 +415,42 @@ function GestorModulos() {
                 <textarea rows={4} placeholder="Contenido de la sección..." value={seccion.contenido} onChange={e => actualizarSeccion(sIndex, 'contenido', e.target.value)} className={inputClase} />
               </div>
 
-              {/* ✅ NUEVO: Campo de video por sección */}
+              {/* Video por sección */}
               <div>
                 <label className={labelClase}>Video de la sección (opcional)</label>
-                <input
-                  type="text"
-                  placeholder="https://www.youtube.com/embed/XXXXXXXXX"
-                  value={seccion.videoUrl || ''}
-                  onChange={e => actualizarSeccion(sIndex, 'videoUrl', e.target.value)}
-                  className={inputClase}
-                />
+                <input type="text" placeholder="https://www.youtube.com/embed/XXXXXXXXX" value={seccion.videoUrl || ''} onChange={e => actualizarSeccion(sIndex, 'videoUrl', e.target.value)} className={inputClase} />
                 <p className="text-xs text-slate-400 mt-1">Deja vacío si esta sección no tiene video.</p>
+              </div>
+
+              {/* ✅ NUEVO: Imágenes por sección */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className={labelClase}>Imágenes de la sección (opcional)</label>
+                  <button onClick={() => agregarImagenSeccion(sIndex)} className="flex items-center gap-1 bg-slate-200 hover:bg-slate-300 text-slate-600 px-3 py-1 rounded-lg text-xs font-bold transition-all">
+                    <Image size={12} /> Agregar imagen
+                  </button>
+                </div>
+                {(seccion.imagenes || []).length === 0 && (
+                  <p className="text-xs text-slate-400">No hay imágenes. Haz clic en "Agregar imagen" para añadir.</p>
+                )}
+                {(seccion.imagenes || []).map((url, imgIndex) => (
+                  <div key={imgIndex} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="URL de la imagen (ej: https://imgur.com/...)"
+                      value={url}
+                      onChange={e => actualizarImagenSeccion(sIndex, imgIndex, e.target.value)}
+                      className={inputClase}
+                    />
+                    {url && (
+                      <img src={url} alt="preview" className="w-12 h-12 object-cover rounded-lg border border-slate-200 shrink-0" onError={e => e.target.style.display='none'} />
+                    )}
+                    <button onClick={() => eliminarImagenSeccion(sIndex, imgIndex)} className="p-2 hover:bg-red-100 rounded-lg transition-all shrink-0">
+                      <Trash2 size={14} className="text-red-400" />
+                    </button>
+                  </div>
+                ))}
+                <p className="text-xs text-slate-400">Puedes usar Google Drive, Imgur u otro servicio de imágenes para obtener la URL.</p>
               </div>
 
               <button onClick={() => actualizarSeccion(sIndex, 'tienePregunta', !seccion.tienePregunta)} className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-bold transition-all ${seccion.tienePregunta ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
@@ -386,6 +477,7 @@ function GestorModulos() {
         </div>
       )}
 
+      {/* CASO PRÁCTICO */}
       {seccionesActivas.casoPractico && (
         <div className="bg-white p-6 rounded-3xl border border-orange-200 shadow-sm space-y-4">
           <h3 className="font-black text-slate-800">Caso Práctico</h3>
@@ -400,6 +492,7 @@ function GestorModulos() {
         </div>
       )}
 
+      {/* PREGUNTAS DEL EXAMEN */}
       {seccionesActivas.preguntas && (
         <div className="bg-white p-6 rounded-3xl border border-orange-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
@@ -438,6 +531,7 @@ function GestorModulos() {
         </div>
       )}
 
+      {/* MATERIALES */}
       {seccionesActivas.materiales && (
         <div className="bg-white p-6 rounded-3xl border border-orange-200 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
@@ -474,6 +568,7 @@ function GestorModulos() {
 export default function AdminDashboard() {
   const [pestanaActiva, setPestanaActiva] = useState('colaboradores');
   const [colaboradores, setColaboradores] = useState([]);
+  const [modulos, setModulos] = useState([]);
   const [busqueda, setBusqueda] = useState("");
   const [cargando, setCargando] = useState(true);
   const [certificadoActivo, setCertificadoActivo] = useState(null);
@@ -486,6 +581,10 @@ export default function AdminDashboard() {
         const lista = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setColaboradores(lista);
         setTotalCertificados(lista.filter(c => c.certificadoEmitido).length);
+
+        // ✅ NUEVO: cargamos módulos para verificar tieneCertificado
+        const modulosSnap = await getDocs(collection(db, "curriculum"));
+        setModulos(modulosSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (error) {
         console.error("Error al conectar:", error);
       } finally {
@@ -531,6 +630,12 @@ export default function AdminDashboard() {
   const totalInscritos = colaboradores.length;
   const totalCompletados = colaboradores.filter(c => c.certificadoEmitido).length;
   const totalEnCurso = colaboradores.filter(c => c.progresoTotal > 0 && !c.certificadoEmitido).length;
+
+  // ✅ NUEVO: función que verifica si el módulo tiene certificado
+  const moduloTieneCertificado = (moduloId) => {
+    const modulo = modulos.find(m => m.id === (moduloId || 'modulo_1'));
+    return modulo?.tieneCertificado || false;
+  };
 
   if (cargando) return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center">
@@ -653,12 +758,15 @@ export default function AdminDashboard() {
                           {colab.examenHabilitado ? 'Habilitado' : 'Bloqueado'}
                         </button>
                       </td>
+                      {/* ✅ NUEVO: Certificado solo si el módulo lo tiene habilitado */}
                       <td className="p-6 text-center">
-                        {colab.ultimoExamen?.aprobado ? (
+                        {colab.ultimoExamen?.aprobado && moduloTieneCertificado('modulo_1') ? (
                           <button onClick={() => emitirCertificado(colab)} className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${colab.certificadoEmitido ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-orange-500 text-white hover:bg-orange-600'}`}>
                             <Award size={14} />
                             {colab.certificadoEmitido ? `Ver Cert. N°${String(colab.numeroCertificado).padStart(3, '0')}` : 'Emitir Certificado'}
                           </button>
+                        ) : colab.ultimoExamen?.aprobado && !moduloTieneCertificado('modulo_1') ? (
+                          <span className="text-slate-400 text-xs font-medium">Sin certificado</span>
                         ) : (
                           <span className="text-slate-300 text-xs">No disponible</span>
                         )}
