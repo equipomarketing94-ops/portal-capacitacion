@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { db } from '../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { 
@@ -31,8 +31,12 @@ const obtenerIcono = (icono) => {
   return iconos[icono] || <BookOpen size={22} className="text-orange-500" />;
 };
 
-export default function ClasePage() {
+function ContenidoClase() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // ✅ CAMBIO CLAVE: leemos el módulo desde la URL
+  const moduloId = searchParams.get('modulo') || 'modulo_1';
+
   const [modulo, setModulo] = useState(null);
   const [colaborador, setColaborador] = useState(null);
   const [cargando, setCargando] = useState(true);
@@ -42,7 +46,8 @@ export default function ClasePage() {
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        const docRef = doc(db, "curriculum", "modulo_1");
+        // ✅ CAMBIO: usamos moduloId en lugar de "modulo_1" fijo
+        const docRef = doc(db, "curriculum", moduloId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           setModulo(docSnap.data());
@@ -63,7 +68,7 @@ export default function ClasePage() {
       }
     };
     cargarDatos();
-  }, []);
+  }, [moduloId]);
 
   const responder = (pasoIndex, opcionIndex) => {
     if (respuestas[pasoIndex] !== undefined) return;
@@ -79,6 +84,7 @@ export default function ClasePage() {
 
   const totalPasos = 1 + (modulo?.secciones?.length || 0) + 1;
   const esUltimoPaso = pasoActual === totalPasos - 1;
+  const numeroModulo = String(moduloId).replace('modulo_', '');
 
   const puedeAvanzar = () => {
     if (pasoActual === 0) return true;
@@ -103,7 +109,7 @@ export default function ClasePage() {
             <ArrowLeft size={24} />
           </button>
           <div className="text-center">
-            <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest">Módulo 1</p>
+            <p className="text-[10px] text-orange-500 font-black uppercase tracking-widest">Módulo {numeroModulo}</p>
             <h1 className="text-sm font-bold">{modulo?.titulo || 'Cargando...'}</h1>
           </div>
           <div className="text-[10px] font-black text-slate-400">
@@ -168,7 +174,6 @@ export default function ClasePage() {
                 </div>
                 <p className="text-slate-400 leading-relaxed whitespace-pre-line">{seccion.contenido}</p>
 
-                {/* Video por sección */}
                 {seccion?.videoUrl && (
                   <div className="mt-4 aspect-video rounded-xl overflow-hidden border border-slate-700">
                     <iframe
@@ -181,7 +186,6 @@ export default function ClasePage() {
                   </div>
                 )}
 
-                {/* ✅ NUEVO: Imágenes por sección */}
                 {seccion?.imagenes && seccion.imagenes.length > 0 && (
                   <div className="mt-4 space-y-3">
                     {seccion.imagenes.map((url, imgIndex) => (
@@ -294,7 +298,7 @@ export default function ClasePage() {
             </button>
           ) : colaborador?.examenHabilitado ? (
             <button
-              onClick={() => router.push('/examen?modulo=modulo_1')}
+              onClick={() => router.push(`/examen?modulo=${moduloId}`)}
               className="flex items-center gap-2 px-6 py-3 rounded-xl font-bold bg-green-500 hover:bg-green-600 text-white transition-all"
             >
               Ir al Examen <ArrowRight size={18} />
@@ -308,5 +312,17 @@ export default function ClasePage() {
 
       </main>
     </div>
+  );
+}
+
+export default function ClasePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
+        <Loader2 className="animate-spin text-orange-500" size={48} />
+      </div>
+    }>
+      <ContenidoClase />
+    </Suspense>
   );
 }
