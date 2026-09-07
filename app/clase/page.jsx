@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Users,
   Map,
-  Play
+  Play,
+  FileText
 } from 'lucide-react';
 
 const obtenerIcono = (icono) => {
@@ -34,7 +35,6 @@ const obtenerIcono = (icono) => {
 function ContenidoClase() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // ✅ CAMBIO CLAVE: leemos el módulo desde la URL
   const moduloId = searchParams.get('modulo') || 'modulo_1';
 
   const [modulo, setModulo] = useState(null);
@@ -46,7 +46,6 @@ function ContenidoClase() {
   useEffect(() => {
     const cargarDatos = async () => {
       try {
-        // ✅ CAMBIO: usamos moduloId en lugar de "modulo_1" fijo
         const docRef = doc(db, "curriculum", moduloId);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
@@ -200,6 +199,32 @@ function ContenidoClase() {
                         </div>
                       ) : null
                     ))}
+                  </div>
+                )}
+
+                {/* ✅ NUEVO: PDF incrustado en la sección */}
+                {seccion?.pdfUrl && (
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <FileText size={16} className="text-orange-500" />
+                      <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Documento de apoyo</p>
+                    </div>
+                    <div className="rounded-xl overflow-hidden border border-slate-700 bg-white">
+                      <iframe
+                        src={seccion.pdfUrl}
+                        title={`PDF ${seccion.titulo}`}
+                        className="w-full"
+                        style={{ height: '600px' }}
+                      />
+                    </div>
+                    
+                      href={seccion.pdfUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 text-sm font-medium"
+                    >
+                      <FileText size={14} /> Abrir PDF en pantalla completa
+                    </a>
                   </div>
                 )}
               </div>

@@ -5,7 +5,7 @@ import {
   Users, TrendingUp, Award, Search, BarChart3, Loader2, 
   ArrowLeft, Unlock, Lock, CheckCircle, XCircle, Printer,
   Plus, Trash2, Save, BookOpen, Video, FileText, 
-  HelpCircle, Edit3, ToggleLeft, ToggleRight, Image
+  HelpCircle, Edit3, ToggleLeft, ToggleRight, Image, File
 } from 'lucide-react';
 import Link from 'next/link';
 import { db } from '../firebase';
@@ -89,7 +89,7 @@ const moduloInicial = {
 
 const seccionInicial = {
   icono: 'definicion', titulo: '', contenido: '', videoUrl: '',
-  imagenes: [], tienePregunta: false,
+  imagenes: [], pdfUrl: '', tienePregunta: false,
   pregunta: { enunciado: '', opciones: ['', '', '', ''], correcta: 0, explicacion: '' }
 };
 
@@ -134,6 +134,7 @@ function GestorModulos() {
         ...s,
         videoUrl: s.videoUrl || '',
         imagenes: s.imagenes || [],
+        pdfUrl: s.pdfUrl || '',
         tienePregunta: !!s.pregunta,
         pregunta: s.pregunta || { enunciado: '', opciones: ['', '', '', ''], correcta: 0, explicacion: '' }
       })),
@@ -152,7 +153,6 @@ function GestorModulos() {
     setVista('formulario');
   };
 
-  // ✅ NUEVO: Eliminar módulo con confirmación
   const eliminarModulo = async (modulo) => {
     const confirmacion = window.confirm(`¿Estás seguro que deseas eliminar el módulo "${modulo.titulo}"? Esta acción no se puede deshacer.`);
     if (!confirmacion) return;
@@ -173,7 +173,6 @@ function GestorModulos() {
   const actualizarPreguntaSeccion = (si, campo, valor) => setModuloActual(prev => ({ ...prev, secciones: prev.secciones.map((s, i) => i === si ? { ...s, pregunta: { ...s.pregunta, [campo]: valor } } : s) }));
   const actualizarOpcionSeccion = (si, oi, valor) => setModuloActual(prev => ({ ...prev, secciones: prev.secciones.map((s, i) => i === si ? { ...s, pregunta: { ...s.pregunta, opciones: s.pregunta.opciones.map((o, j) => j === oi ? valor : o) } } : s) }));
 
-  // ✅ NUEVO: Imágenes por sección
   const agregarImagenSeccion = (si) => setModuloActual(prev => ({
     ...prev,
     secciones: prev.secciones.map((s, i) => i === si ? { ...s, imagenes: [...(s.imagenes || []), ''] } : s)
@@ -215,10 +214,11 @@ function GestorModulos() {
         datos.secciones = moduloActual.secciones.map(s => {
           const sec = { icono: s.icono, titulo: s.titulo, contenido: s.contenido };
           if (s.videoUrl) sec.videoUrl = s.videoUrl;
-          // ✅ NUEVO: guardamos imágenes si existen
           if (s.imagenes && s.imagenes.length > 0) {
             sec.imagenes = s.imagenes.filter(url => url.trim() !== '');
           }
+          // ✅ NUEVO: guardamos el PDF de la sección si existe
+          if (s.pdfUrl && s.pdfUrl.trim() !== '') sec.pdfUrl = s.pdfUrl;
           if (s.tienePregunta) sec.pregunta = s.pregunta;
           return sec;
         });
@@ -285,7 +285,6 @@ function GestorModulos() {
                   </div>
                 </div>
               </div>
-              {/* ✅ NUEVO: Botones editar y eliminar */}
               <div className="flex items-center gap-2">
                 <button onClick={() => iniciarEdicion(modulo)} className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-xl font-bold text-sm transition-all">
                   <Edit3 size={14} /> Editar
@@ -334,7 +333,6 @@ function GestorModulos() {
             <input type="text" placeholder="ej: Acoso Laboral" value={moduloActual.titulo} onChange={e => setModuloActual(prev => ({ ...prev, titulo: e.target.value }))} className={inputClase} />
           </div>
         </div>
-        {/* ✅ NUEVO: Toggle de certificado */}
         <div>
           <label className={labelClase}>¿Este módulo tiene certificado?</label>
           <button
@@ -422,7 +420,7 @@ function GestorModulos() {
                 <p className="text-xs text-slate-400 mt-1">Deja vacío si esta sección no tiene video.</p>
               </div>
 
-              {/* ✅ NUEVO: Imágenes por sección */}
+              {/* Imágenes por sección */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className={labelClase}>Imágenes de la sección (opcional)</label>
@@ -451,6 +449,24 @@ function GestorModulos() {
                   </div>
                 ))}
                 <p className="text-xs text-slate-400">Puedes usar Google Drive, Imgur u otro servicio de imágenes para obtener la URL.</p>
+              </div>
+
+              {/* ✅ NUEVO: PDF por sección */}
+              <div>
+                <label className={labelClase}>Documento PDF de la sección (opcional)</label>
+                <div className="flex items-center gap-2">
+                  <File size={16} className="text-orange-500 shrink-0" />
+                  <input
+                    type="text"
+                    placeholder="URL del PDF (ej: https://drive.google.com/...)"
+                    value={seccion.pdfUrl || ''}
+                    onChange={e => actualizarSeccion(sIndex, 'pdfUrl', e.target.value)}
+                    className={inputClase}
+                  />
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Si usas Google Drive, el enlace debe terminar en /preview. Deja vacío si no hay PDF.
+                </p>
               </div>
 
               <button onClick={() => actualizarSeccion(sIndex, 'tienePregunta', !seccion.tienePregunta)} className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-bold transition-all ${seccion.tienePregunta ? 'bg-orange-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
@@ -582,7 +598,6 @@ export default function AdminDashboard() {
         setColaboradores(lista);
         setTotalCertificados(lista.filter(c => c.certificadoEmitido).length);
 
-        // ✅ NUEVO: cargamos módulos para verificar tieneCertificado
         const modulosSnap = await getDocs(collection(db, "curriculum"));
         setModulos(modulosSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (error) {
@@ -631,7 +646,6 @@ export default function AdminDashboard() {
   const totalCompletados = colaboradores.filter(c => c.certificadoEmitido).length;
   const totalEnCurso = colaboradores.filter(c => c.progresoTotal > 0 && !c.certificadoEmitido).length;
 
-  // ✅ NUEVO: función que verifica si el módulo tiene certificado
   const moduloTieneCertificado = (moduloId) => {
     const modulo = modulos.find(m => m.id === (moduloId || 'modulo_1'));
     return modulo?.tieneCertificado || false;
@@ -758,7 +772,6 @@ export default function AdminDashboard() {
                           {colab.examenHabilitado ? 'Habilitado' : 'Bloqueado'}
                         </button>
                       </td>
-                      {/* ✅ NUEVO: Certificado solo si el módulo lo tiene habilitado */}
                       <td className="p-6 text-center">
                         {colab.ultimoExamen?.aprobado && moduloTieneCertificado('modulo_1') ? (
                           <button onClick={() => emitirCertificado(colab)} className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${colab.certificadoEmitido ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-orange-500 text-white hover:bg-orange-600'}`}>
